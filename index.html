@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Guess the Image</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+    img {
+      max-width: 300px;
+      margin-bottom: 20px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+    }
+    #feedback {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    #hint {
+      margin-top: 20px;
+      font-weight: bold;
+      color: blue;
+    }
+    #splashScreen {
+      display: block;
+    }
+    #gameScreen {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="splashScreen">
+    <h1>Guess the Image</h1>
+    <button onclick="playDailyPuzzle()">Play Daily Puzzle</button>
+    <div id="todayDate" style="margin-top: 10px; font-weight: bold;"></div>
+    <br><br>
+    <label for="datePicker">Or choose a date:</label>
+    <input type="date" id="datePicker" onchange="playSelectedDate()">
+  </div>
+
+  <div id="gameScreen">
+    <h1>Guess the Image</h1>
+    <img id="mysteryImage" src="" alt="Guess this image">
+    <br>
+    <input type="text" id="guessInput" placeholder="Your guess here">
+    <button onclick="checkGuess()">Submit</button>
+    <div id="feedback"></div>
+    <button onclick="returnToMainMenu()">Return to Main Menu</button>
+    <button onclick="showHint()">Hint</button>
+    <div id="hint"></div>
+  </div>
+
+<script>
+  let currentDate = "";
+  let validDates = [];
+
+  async function loadValidDates() {
+    const response = await fetch('answers.csv');
+    const text = await response.text();
+    const lines = text.split('\n');
+    validDates = lines.map(line => line.split(',')[0].trim());
+  }
+
+  function getFormattedDate(dateString) {
+    const [year, month, day] = dateString.split("-");
+    const mm = month.padStart(2, '0');
+    const dd = day.padStart(2, '0');
+    const yy = year.slice(-2);
+    return mm + dd + yy;
+  }
+
+  async function playDailyPuzzle() {
+    if (validDates.length === 0) await loadValidDates();
+    const today = new Date();
+    const formatted = getFormattedDate(today.toISOString().split('T')[0]);
+    if (validDates.includes(formatted)) {
+      startGame(formatted);
+    } else {
+      alert("No puzzle available for today.");
+    }
+  }
+
+  async function playSelectedDate() {
+    if (validDates.length === 0) await loadValidDates();
+    const selected = document.getElementById("datePicker").value;
+    if (!selected) return;
+    const formatted = getFormattedDate(selected);
+    if (validDates.includes(formatted)) {
+      startGame(formatted);
+    } else {
+      alert("No puzzle available for that date.");
+    }
+  }
+
+  function startGame(dateCode) {
+    currentDate = dateCode;
+    document.getElementById("splashScreen").style.display = "none";
+    document.getElementById("gameScreen").style.display = "block";
+    document.getElementById("mysteryImage").src = `images/image${dateCode}.jpg?${Date.now()}`;
+  }
+
+  function returnToMainMenu() {
+    document.getElementById("splashScreen").style.display = "block";
+    document.getElementById("gameScreen").style.display = "none";
+    document.getElementById("guessInput").value = "";
+    document.getElementById("feedback").textContent = "";
+    document.getElementById("hint").textContent = "";
+    document.getElementById("mysteryImage").src = "";
+  }
+
+  async function checkGuess() {
+    const guess = document.getElementById("guessInput").value.trim().toLowerCase();
+    const feedback = document.getElementById("feedback");
+
+    try {
+      const response = await fetch('answers.csv');
+      if (!response.ok) throw new Error("Failed to load CSV");
+
+      const text = await response.text();
+      const lines = text.split('\n');
+      let correct = "";
+
+      for (let line of lines) {
+        if (!line.trim()) continue;
+        const [date, answer] = line.split(',');
+        if (date && date.trim() === currentDate) {
+          correct = answer.trim().toLowerCase();
+          break;
+        }
+      }
+
+      if (!correct) {
+        feedback.textContent = "⚠️ No answer found for this date.";
+        feedback.style.color = "orange";
+      } else if (guess === correct) {
+        feedback.textContent = "🎉 Correct!";
+        feedback.style.color = "green";
+      } else {
+        feedback.textContent = "❌ Try again!";
+        feedback.style.color = "red";
+      }
+    } catch (error) {
+      console.error("Error loading CSV:", error);
+      feedback.textContent = "⚠️ Error loading puzzle data.";
+      feedback.style.color = "orange";
+    }
+  }
+
+  async function showHint() {
+    const hint = document.getElementById("hint");
+
+    try {
+      const response = await fetch('answers.csv');
+      if (!response.ok) throw new Error("Failed to load CSV");
+
+      const text = await response.text();
+      const lines = text.split('\n');
+      let category = "";
+
+      for (let line of lines) {
+        if (!line.trim()) continue;
+        const [date, answer, cat] = line.split(',');
+        if (date && date.trim() === currentDate) {
+          category = cat ? cat.trim() : "";
+          break;
+        }
+      }
+
+      if (!category) {
+        hint.textContent = "⚠️ No hint available for this date.";
+        hint.style.color = "orange";
+      } else {
+        hint.textContent = `Hint: ${category}`;
+        hint.style.color = "blue";
+      }
+    } catch (error) {
+      console.error("Error loading CSV:", error);
+      hint.textContent = "⚠️ Error loading hint data.";
+      hint.style.color = "orange";
+    }
+  }
+</script>
+
+</body>
+</html>
